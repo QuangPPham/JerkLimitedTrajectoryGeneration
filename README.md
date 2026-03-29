@@ -17,13 +17,11 @@ p_interp = path_profile.p_interp # interpolation knot points
 t_interp = path_profile.t_interp # interpolation time
 ```
 
-To interpolate at the servo loop frequencyL
+To interpolate at the servo loop frequency:
 ```
 recon = ServoRecon()
 recon.add_trajectory(p_interp, t_interp)
-
-# get time, positions, path distance, velocities, feedrate, accelerations, path acceleration, jerks, path jerks
-t_sampling, p_sampling, s_sampling, v_sampling, sv_sampling, a_sampling, sa_sampling, j_sampling, sj_sampling = recon.get_sampling_reference(Ts=0.001)
+t_sampling, p_sampling = recon.get_sampling_reference(Ts=0.001)[:2
 ```
 
 To connect 2 or more trajectories:
