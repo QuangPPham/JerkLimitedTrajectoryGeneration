@@ -6,7 +6,7 @@ knots = [
                     # Z-axis if needed
 ] 
 q_spline = QuinticSplineInterpolation(knots)
-p_interp, _, _ = q_spline.calc_interpolator_points(dTs, des_F, 0., 0.)
+p_interp, _, _ = q_spline.calc_interpolator_points(Ts=0.001, F=0.1, fs=0., fe=0.)
  ```
 
 To contruct the path profile (this automatically calls the quintic spline interpolation):
@@ -32,8 +32,8 @@ knots2 = [...] # IMPORTANT: firtst point of second path is last point of first p
 path_profile2 = JerkLimitedProfile(knots2, Ts, fs,
                                     F, fe, A, D, J)
 p_interp2 = path_profile2.p_interp
-s_interp2 = path_profile2.s_interp + s_interp[-1] # do not reset travel distance to 0
-t_interp2 = path_profile2.t_interp + t_interp[-1] # do not reset time to 0
-recon.add_trajectory(p_interp2, t_interp2, offset_time=False)
+t_interp2 = path_profile2.t_interp
+
+recon.add_trajectory(p_interp2, t_interp2, offset_time=True)
 t_sampling, p_sampling = recon.get_sampling_reference(Ts)[:2]
 ```
