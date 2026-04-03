@@ -204,6 +204,7 @@ class JerkLimitedProfile():
         self.Ls[6] = self.Fs[6]*self.T[6] - self.D*self.T[6]**2 / 2 + self.J2*self.T[6]**3 / 6
         self.Ss = np.hstack((0.0, np.cumsum(self.Ls)))
 
+
     def travel_lengths_quantization(self):
         """Quantize the travel length into N segments
         """
@@ -232,17 +233,20 @@ class JerkLimitedProfile():
 
         # modified N
         if np.sum(self.Ns) != self.N:
-            self.N = np.sum(self.Ns)
-            self.calc_interpolator_points(self.N)
+            print(f"Remaking path with N = {np.sum(self.Ns)}")
+            self.calc_interpolator_points(np.sum(self.Ns))
 
         # quantized travel lengths
         self.L_prime = self.Ns * self.delta_s
 
         # adjust for new travel lengths
-        self.quantization_adjustment()
+        # print(f"Before quantization adjustment: A = {self.A}, D = {self.D}, J1 = {self.J1}, J2 = {self.J2}, T = {self.T}")
+        # self.quantization_adjustment()
+        # print(f"After quantization adjustment: A = {self.A}, D = {self.D}, J1 = {self.J1}, J2 = {self.J2}, T = {self.T}")
 
-        # Recalculate feedrate
-        self.calc_feedrate()
+        # # Recalculate feedrate
+        # self.calc_feedrate()
+        # self.calc_travel_distance()
 
 
     def quantization_adjustment(self):
@@ -262,7 +266,7 @@ class JerkLimitedProfile():
                 fx[2] = A*T3**2 / 3 + A*T1*T3 / 2 + self.fs*T3 - self.L_prime[2]
 
             # D, T5, T7
-            fx[3] = self.F * T5 - D*T5**2 / 6 - self.L_prime[4]
+            fx[3] = self.F*T5 - D*T5**2 / 6 - self.L_prime[4]
             if self.T[5] != 0:
                 fx[4] = D*T5**2 / 8 - D*T7**2 / 8 - self.F*T5/2 - self.fe*T7/2 + (self.F**2 - self.fe**2)/(2*D) - self.L_prime[5]
                 fx[5] = self.fe*T7 + D*T7**2 / 6 - self.L_prime[6]
@@ -324,36 +328,40 @@ class JerkLimitedProfile():
 
 
     def continuously_execute(self):
-        current_n = 1
+        # current_n = 1
+        # self.Ss = np.hstack((0.0, np.cumsum(self.L_prime)))
         for k in range(7):
             tau_last = 0.
             j0 = self.Js[k]
             a0 = self.As[k]
             f0 = self.Fs[k]
+            
+            # n = 0
             # s0 = self.Ss[k]
-            # for _ in range(int(self.Ns[k])):
+            # while n < self.Ns[k]:
             #     s_poly = Polynomial([s0-current_n*self.delta_s, f0, a0/2, j0/6])
-            #     current_n += 1
             for n in range(int(self.Ns[k])):
                 s_poly = Polynomial([-(n+1)*self.delta_s, f0, a0/2, j0/6])
                 s_deriv = s_poly.deriv()
                 # solve newton-raphson
                 f  = lambda x: s_poly(x)
                 df = lambda x: s_deriv(x)
-                tau_guess = tau_last+self.Ts
-                sol = root_scalar(f=f, fprime=df, x0=tau_guess)
+                sol = root_scalar(f=f, fprime=df, x0=tau_last+self.Ts)
                 if sol.converged:
                     tau = sol.root
                 else:
-                    tau = tau_guess
+                    tau = tau_last+self.Ts
                     print("Finding tau_next did not converge")
+                if k == 6 and n == self.Ns[k]-1:
+                    if tau > self.T[k]:
+                        tau = self.T[k]
                 # Append
                 self.T_interp += [tau - tau_last]
+                # current_n += 1
+                # n+=1
                 tau_last = tau
 
-        # print(np.sum(self.Ls), np.sum(self.L_prime))
         self.T_interp = np.array(self.T_interp)
-
 
     def interpolate(self, t, i):
         j0 = self.Js[i]

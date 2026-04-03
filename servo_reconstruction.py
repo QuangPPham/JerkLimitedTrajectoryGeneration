@@ -117,13 +117,13 @@ class ServoRecon(QuinticSplineInterpolation):
                 if j < len(T_interp)-1:
                     t_eval -= T_interp[j]
                     j+=1
-            p_sampling[:, i] = self.interpolate(t_eval, j)[0] # , v_sampling[:, i], a_sampling[:, i], j_sampling[:, i] = self.interpolate(t_eval)
-            if i >= 1:
-                v_sampling[:,i] = (p_sampling[:, i] - p_sampling[:, i-1]) / Ts
-            if i >= 2:
-                a_sampling[:,i] = (v_sampling[:, i] - v_sampling[:, i-1]) / Ts
-            if i >= 3:
-                j_sampling[:,i] = (a_sampling[:, i] - a_sampling[:, i-1]) / Ts
+            p_sampling[:, i], v_sampling[:, i], a_sampling[:, i], j_sampling[:, i] = self.interpolate(t_eval, j)
+            # if i >= 1:
+            #     v_sampling[:,i] = (p_sampling[:, i] - p_sampling[:, i-1]) / Ts
+            # if i >= 2:
+            #     a_sampling[:,i] = (v_sampling[:, i] - v_sampling[:, i-1]) / Ts
+            # if i >= 3:
+            #     j_sampling[:,i] = (a_sampling[:, i] - a_sampling[:, i-1]) / Ts
 
         ds_sampling = np.linalg.norm(p_sampling[:,1:] - p_sampling[:,:-1], axis=0)
         s_sampling = np.hstack((0., np.cumsum(ds_sampling)))
