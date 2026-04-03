@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.polynomial import Polynomial
 from quintic_spline import QuinticSplineInterpolation
+from scipy.interpolate import CubicSpline
 
 class ServoRecon(QuinticSplineInterpolation):
     def __init__(self):
@@ -16,33 +17,42 @@ class ServoRecon(QuinticSplineInterpolation):
         self.p = np.atleast_2d(np.asarray(p))
         self.n, self.t = self.p.shape
         if len(self.total_t) == 0:
+            # if no trajectory exists, initialize time array
             self.ts = np.asarray(t)
             self.total_t = self.ts
         else:
+            # else append it to current time array
             if offset_time:
                 self.ts = np.asarray(t) + self.total_t[-1]
             else:
                 self.ts = np.asarray(t)
             self.total_t = np.hstack((self.total_t, self.ts[1:]))
 
-        self.l = self.ts[1:] - self.ts[:-1]         # (t-1,)
-        self.l_1 = self.l[:-1] + self.l[1:]         # (t-2,)
-        self.l_2 = self.l_1[:-1] + self.l[2:]       # (t-3,)
-        self.dp = self.p[:, 1:] - self.p[:, :-1]    # (n, t-1)
-        self.dp_1 = self.p[:, 2:] - self.p[:, :-2]  # (n, t-2)
-        self.dp_2 = self.p[:, 3:] - self.p[:, :-3]  # (n, t-3)
+        # Instead of parameterizing with chord length, we parameterize with time
+        self.l = self.ts[1:] - self.ts[:-1]
+        self.l_1 = self.l[:-1] + self.l[1:]
+        self.l_2 = self.l_1[:-1] + self.l[2:]
+        self.dp = self.p[:, 1:] - self.p[:, :-1]
+        self.dp_1 = self.p[:, 2:] - self.p[:, :-2]
+        self.dp_2 = self.p[:, 3:] - self.p[:, :-3]
 
-        # Piecewise quintic splines
+        # ensure continuity of derivatives between trajectories
         self.d1, self.d2 = self.calc_derivatives()
         if len(self.spline) != 0:
             self.d1[:,0] = self.last_d1[:,-1]
             self.d2[:,0] = self.last_d2[:,-1]
         self.last_d1 = self.d1
         self.last_d2 = self.d2
+
+        # Piecewise quintic splines
         self.coeff = self.calc_quintic_coef()
         A, B, C, D, E, F = self.coeff
         if len(self.spline) == 0:
             # spline[n][t]
+            # self.spline = CubicSpline(self.ts, self.p, axis=1, bc_type='not-a-knot')
+            # self.v_spline = self.spline.derivative()
+            # self.a_spline = self.v_spline.derivative()
+            # self.j_spline = self.a_spline.derivative()
             self.spline = [
                 [Polynomial([F[n,i], E[n,i], D[n,i], C[n,i], B[n,i], A[n,i]])
                     for i in range(self.t-1)]
@@ -61,6 +71,7 @@ class ServoRecon(QuinticSplineInterpolation):
                 for n in range(self.n)]
         else:
             for n in range(self.n):
+                # self.spline += [CubicSpline(self.ts, self.p, axis=1, bc_type='not-a-knot')]
                 self.spline[n] += [
                     Polynomial([F[n,i], E[n,i], D[n,i], C[n,i], B[n,i], A[n,i]])
                         for i in range(self.t-1)
@@ -79,11 +90,16 @@ class ServoRecon(QuinticSplineInterpolation):
                 ]
 
     def interpolate(self, u, i):
+        # p_interp = self.spline(u)
+        # v_interp = self.v_spline(u)
+        # a_interp = self.a_spline(u)
+        # j_interp = self.j_spline(u)
         p_interp = [self.spline[n][i](u) for n in range(self.n)]
         v_interp = [self.v_spline[n][i](u) for n in range(self.n)]
         a_interp = [self.a_spline[n][i](u) for n in range(self.n)]
         j_interp = [self.j_spline[n][i](u) for n in range(self.n)]
-        return np.array(p_interp), np.array(v_interp), np.array(a_interp), np.array(j_interp) # (n,)
+        return np.asarray(p_interp), np.array(v_interp), np.array(a_interp), np.array(j_interp) # (n,)
+
 
     def get_sampling_reference(self, Ts):
         t_interp = self.total_t
@@ -95,12 +111,19 @@ class ServoRecon(QuinticSplineInterpolation):
         j_sampling = np.zeros((self.n, len(t_sampling)))
         j = 0
         for i, t in enumerate(t_sampling):
+            t_eval = t
             t_eval = t - t_interp[j]
             if t_eval > T_interp[j]:
                 if j < len(T_interp)-1:
                     t_eval -= T_interp[j]
                     j+=1
-            p_sampling[:, i], v_sampling[:, i], a_sampling[:, i], j_sampling[:, i], = self.interpolate(t_eval, j)
+            p_sampling[:, i] = self.interpolate(t_eval, j)[0] # , v_sampling[:, i], a_sampling[:, i], j_sampling[:, i] = self.interpolate(t_eval)
+            if i >= 1:
+                v_sampling[:,i] = (p_sampling[:, i] - p_sampling[:, i-1]) / Ts
+            if i >= 2:
+                a_sampling[:,i] = (v_sampling[:, i] - v_sampling[:, i-1]) / Ts
+            if i >= 3:
+                j_sampling[:,i] = (a_sampling[:, i] - a_sampling[:, i-1]) / Ts
 
         ds_sampling = np.linalg.norm(p_sampling[:,1:] - p_sampling[:,:-1], axis=0)
         s_sampling = np.hstack((0., np.cumsum(ds_sampling)))

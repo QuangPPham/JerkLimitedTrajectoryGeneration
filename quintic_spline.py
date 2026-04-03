@@ -190,7 +190,11 @@ class QuinticSplineInterpolation():
                 f = lambda u: g(u)
                 f_prime = lambda u: g_prime(u)
                 sol = root_scalar(f=f, fprime=f_prime, x0=u_next_guess)
-                u_next = sol.root
+                if sol.converged:
+                    u_next = sol.root
+                else:
+                    u_next = u_next_guess
+                    print("Finding u_next did not converge")
                 # if next guess is larger than segment length
                 if u_next > self.l[i]:
                     # if it's the last segment, just use the entire segment length

@@ -4,19 +4,20 @@ import matplotlib.pyplot as plt
 
 des_F = 0.1  # m/s
 dTs = 0.005   # s
-knots = np.array([
-    (0.,   0.),
-    (0.01, 0.005),
-    (0.02, 0.),
-    (0.03, 0.005),
-    [0.04, 0.01]
-]).T
+# knots = np.array([
+#     (0.,   0.),
+#     (0.01, 0.005),
+#     (0.02, 0.),
+#     (0.03, 0.005),
+#     [0.04, 0.01]
+# ]).T
 
 # x = np.linspace(-0.05, 0.05, 20)
 # y = 0.05*np.cos(60*x)
 # knots = np.array([x, y])
 
-# knots = np.linspace(0., 0.01, 10)
+x = np.linspace(0., 0.02, 10)
+knots = np.vstack((x, np.zeros_like(x)))
 
 # Test quintic spline
 q_spline = QuinticSplineInterpolation(knots)
